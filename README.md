@@ -13,6 +13,14 @@ It incorporates real-world features like mileage, car age, condition, fuel type,
 You can access the app through a browser via Streamlit, enter the details of a used car, and receive an instant price prediction.
 
 ---
+##  Working App
+
+Check out the **live demo** of the Used Car Price Estimator here:
+
+👉 [🟢 Launch App](https://usedcarspriceestimator.streamlit.app/)  
+*(hosted with Streamlit Cloud)*
+
+---
 
 ##  Features
 
