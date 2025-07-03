@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 import pickle
 from catboost import CatBoostRegressor, Pool
+# Load CatBoost model
+model = CatBoostRegressor()
+model.load_model("models/catboost_model.cbm")
 
-# --- Load model and encodings ---
-with open("models/catboost_model.pkl", "rb") as f:
-    model = pickle.load(f)
-
+# Load encodings
 with open("models/manufacturer_means.pkl", "rb") as f:
     manufacturer_means = pickle.load(f)
 
