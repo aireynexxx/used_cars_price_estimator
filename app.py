@@ -15,22 +15,17 @@ with open("models/manufacturer_means.pkl", "rb") as f:
 with open("models/model_means.pkl", "rb") as f:
     model_means = pickle.load(f)
 
-# --- Define dropdown options ---
-manufacturers = sorted(manufacturer_means.keys())
-models = sorted(model_means.keys())
-years = list(range(1980, 2026))
-
 # --- App Title ---
 st.set_page_config(page_title="Used Car Price Estimator", layout="centered")
-st.title("🚗 Used Car Price Estimator")
+st.title(" Used Car Price Estimator")
 st.write("Enter the details of a used car to get an estimated resale price.")
 
 # --- Input Layout ---
 col1, col2 = st.columns(2)
 
 with col1:
-    manufacturer = st.selectbox("Manufacturer", manufacturers)
-    car_model = st.selectbox("Model", models)
+    manufacturer = st.text_input("Manufacturer (e.g., ford, honda)").lower().strip()
+    car_model = st.text_input("Model (e.g., civic, f-150)").lower().strip()
     condition = st.selectbox("Condition", ['excellent', 'good', 'like new', 'fair', 'new', 'salvage'])
     cylinders = st.selectbox("Cylinders", ['4 cylinders', '6 cylinders', '8 cylinders', '3 cylinders', '5 cylinders', '10 cylinders', '12 cylinders', 'other'])
 
@@ -49,7 +44,7 @@ with col3:
 
 with col4:
     odometer = st.number_input("Odometer (miles)", min_value=0, value=60000)
-    year = st.select_slider("Year of Manufacture", options=years, value=2015)
+    year = st.number_input("Year of Manufacture", min_value=1980, max_value=2025, value=2015)
 
 # --- Estimate Price ---
 if st.button("Estimate Price"):
@@ -59,18 +54,17 @@ if st.button("Estimate Price"):
     high_mileage = int(odometer > 150000)
     odometer_log = np.log1p(odometer)
 
-    # Mean encodings
-    manufacturer_key = manufacturer.lower().strip()
-    car_model_key = car_model.lower().strip()
-    manufacturer_encoded = manufacturer_means.get(manufacturer_key, np.mean(list(manufacturer_means.values())))
-    model_encoded = model_means.get(car_model_key, np.mean(list(model_means.values())))
+    # Manufacturer mean encoding
+    manufacturer_encoded = manufacturer_means.get(manufacturer, manufacturer_means.mean())
+    model_encoded = model_means.get(car_model, model_means.mean())
+
     est_price = manufacturer_encoded
     ppm_log = np.log1p(est_price / (odometer + 1))
 
     # --- Prepare input row ---
     input_df = pd.DataFrame([{
-        'manufacturer': manufacturer_key,
-        'model': car_model_key,
+        'manufacturer': manufacturer,
+        'model': car_model,
         'condition': condition,
         'cylinders': cylinders,
         'fuel': fuel,
