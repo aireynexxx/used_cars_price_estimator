@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 from catboost import CatBoostRegressor, Pool
 
-# --- Load model and encoding maps ---
+# --- Load model and encodings ---
 with open("models/catboost_model.pkl", "rb") as f:
     model = pickle.load(f)
 
@@ -17,15 +17,27 @@ with open("models/model_means.pkl", "rb") as f:
 with open("models/region_means.pkl", "rb") as f:
     region_means = pickle.load(f)
 
-with open("models/feature_columns.pkl", "rb") as f:
-    expected_columns = pickle.load(f)
+# --- Define feature columns (must match training order) ---
+final_columns = [
+    'model', 'condition', 'cylinders', 'fuel', 'title_status', 'transmission',
+    'drive', 'type', 'paint_color',
+    'car_age', 'car_age_squared', 'is_old', 'high_mileage',
+    'manufacturer_encoded', 'region_encoded', 'model_encoded',
+    'odometer_log', 'ppm_log', 'odometer_per_year',
+    'age_odometer_interaction', 'log_odometer_times_age', 'odometer_bin'
+]
 
-# --- App UI ---
+categorical_features = [
+    'model', 'condition', 'cylinders', 'fuel', 'title_status',
+    'transmission', 'drive', 'type', 'paint_color'
+]
+
+# --- UI ---
 st.set_page_config(page_title="Used Car Price Estimator", layout="centered")
 st.title("Used Car Price Estimator")
 st.write("Enter the details of a used car to estimate its resale value.")
 
-# --- Layout ---
+# --- Inputs ---
 col1, col2 = st.columns(2)
 with col1:
     manufacturer = st.selectbox("Manufacturer", sorted(manufacturer_means.index))
@@ -54,8 +66,6 @@ odometer = st.number_input("Odometer (in miles)", min_value=0, value=60000)
 
 # --- Estimate Price ---
 if st.button("Estimate Price"):
-
-    # --- Encode inputs ---
     region_clean = region.strip().lower()
     model_clean = model_name.strip().lower()
 
@@ -63,7 +73,7 @@ if st.button("Estimate Price"):
     model_encoded = model_means.get(model_clean, model_means.mean())
     region_encoded = region_means.get(region_clean, region_means.mean())
 
-    # --- Feature engineering ---
+    # Feature engineering
     car_age = 2025 - year
     is_old = int(car_age > 10)
     high_mileage = int(odometer > 150000)
@@ -76,8 +86,8 @@ if st.button("Estimate Price"):
     odometer_bin = pd.cut([odometer], bins=[0, 30000, 60000, 100000, 150000, 200000, 300000], labels=False)[0]
     if np.isnan(odometer_bin): odometer_bin = 0
 
-    # --- Build input DataFrame ---
-    input_df = pd.DataFrame([{
+    # Build input row
+    input_data = {
         'model': model_clean,
         'condition': condition,
         'cylinders': cylinders,
@@ -100,17 +110,19 @@ if st.button("Estimate Price"):
         'age_odometer_interaction': age_odometer_interaction,
         'log_odometer_times_age': log_odometer_times_age,
         'odometer_bin': int(odometer_bin)
-    }])
+    }
 
-    # --- Align with training features ---
-    for col in expected_columns:
-        if col not in input_df.columns:
-            input_df[col] = 0
+    input_df = pd.DataFrame([input_data])[final_columns]
 
-    input_df = input_df[expected_columns]
+    # Clean up categorical features
+    for col in categorical_features:
+        input_df[col] = input_df[col].fillna("missing").astype(str)
 
-    # --- Predict ---
-    pool = Pool(input_df)
-    log_price = model.predict(pool)[0]
-    predicted_price = np.expm1(log_price)
-    st.success(f"Estimated Price: **${predicted_price:,.2f}**")
+    # Predict
+    try:
+        pool = Pool(input_df, cat_features=categorical_features)
+        log_price = model.predict(pool)[0]
+        predicted_price = np.expm1(log_price)
+        st.success(f"Estimated Price: **${predicted_price:,.2f}**")
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
