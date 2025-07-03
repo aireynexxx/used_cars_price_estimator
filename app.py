@@ -8,19 +8,21 @@ from catboost import CatBoostRegressor
 with open("models/catboost_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# --- Load mean encodings ---
+# --- Load mean encodings and convert to dicts if needed ---
 with open("models/manufacturer_means.pkl", "rb") as f:
     manufacturer_means = pickle.load(f)
+    manufacturer_means = dict(manufacturer_means)
 
 with open("models/model_means.pkl", "rb") as f:
     model_means = pickle.load(f)
+    model_means = dict(model_means)
 
 # --- Dropdown options ---
 manufacturer_options = sorted(manufacturer_means.keys())
 
 # --- App Title ---
 st.set_page_config(page_title="Used Car Price Estimator", layout="centered")
-st.title(" Used Car Price Estimator")
+st.title("Used Car Price Estimator")
 st.write("Enter the details of a used car to get an estimated resale price.")
 
 # --- Input Layout ---
@@ -57,10 +59,9 @@ if st.button("Estimate Price"):
     high_mileage = int(odometer > 150000)
     odometer_log = np.log1p(odometer)
 
-    # Mean encoding with fallback to global mean
-    manufacturer_encoded = manufacturer_means.get(manufacturer, np.mean(list(manufacturer_means.values())))
-    model_encoded = model_means.get(car_model, np.mean(list(model_means.values())))
-
+    # Mean encodings with fallback
+    manufacturer_encoded = manufacturer_means[manufacturer] if manufacturer in manufacturer_means else np.mean(list(manufacturer_means.values()))
+    model_encoded = model_means[car_model] if car_model in model_means else np.mean(list(model_means.values()))
     est_price = manufacturer_encoded
     ppm_log = np.log1p(est_price / (odometer + 1))
 
@@ -88,4 +89,4 @@ if st.button("Estimate Price"):
     # --- Predict ---
     y_pred_log = model.predict(input_df)[0]
     y_pred = np.expm1(y_pred_log)
-    st.success(f" Estimated Price: **${y_pred:,.2f}**")
+    st.success(f"Estimated Price: **${y_pred:,.2f}**")
