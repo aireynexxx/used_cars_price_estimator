@@ -5,14 +5,14 @@ import pickle
 from catboost import CatBoostRegressor
 
 # --- Load trained model ---
-with open("catboost_model.pkl", "rb") as f:
+with open("models/catboost_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 # --- Load mean encodings ---
-with open("notebooks/manufacturer_means.pkl", "rb") as f:
+with open("models/manufacturer_means.pkl", "rb") as f:
     manufacturer_means = pickle.load(f)
 
-with open("notebooks/model_means.pkl", "rb") as f:
+with open("models/model_means.pkl", "rb") as f:
     model_means = pickle.load(f)
 
 # --- App Title ---
