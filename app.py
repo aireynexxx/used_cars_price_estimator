@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import catboost  # Needed for Pool
 from catboost import CatBoostRegressor
 
 # --- Load Model and Encoding Maps ---
@@ -14,11 +15,12 @@ with open("models/model_means.pkl", "rb") as f:
 with open("models/region_means.pkl", "rb") as f:
     region_means = pickle.load(f)
 
-# --- Title ---
-st.title(" Used Car Price Predictor")
-st.caption("Enter your vehicle details to estimate its resale price.")
+# --- App Header ---
+st.set_page_config(page_title="Used Car Price Predictor", layout="centered")
+st.title(" Used Car Price Estimator")
+st.caption("Enter your vehicle details to get an estimated resale price.")
 
-# --- Layout (2 per row using columns) ---
+# --- Layout: 2 per row ---
 col1, col2 = st.columns(2)
 with col1:
     manufacturer = st.selectbox("Manufacturer", sorted(manufacturer_means.index))
@@ -55,23 +57,23 @@ with col11:
 with col12:
     year = st.slider("Year", 1995, 2025, 2015)
 
-# --- Single full width for numeric ---
+# --- Odometer ---
 odometer = st.number_input("Odometer (in miles)", min_value=0, value=60000)
 
 # --- Predict Button ---
 if st.button("Estimate Price"):
 
-    # Clean user input
+    # Clean inputs
     region_clean = region.strip().lower()
     model_clean = model_name.strip().lower()
 
-    # Lookup encodings with fallback
+    # Lookups with fallback
     manufacturer_encoded = manufacturer_means.get(manufacturer, manufacturer_means.mean())
 
     if region_clean in region_means:
         region_encoded = region_means[region_clean]
     else:
-        st.warning("️ Region not recognized — using average.")
+        st.warning("⚠️ Region not recognized — using average.")
         region_encoded = region_means.mean()
 
     if model_clean in model_means:
@@ -80,7 +82,7 @@ if st.button("Estimate Price"):
         st.warning("⚠️ Model not recognized — using average.")
         model_encoded = model_means.mean()
 
-    # Feature engineering
+    # Feature Engineering
     car_age = 2025 - year
     is_old = int(car_age > 10)
     high_mileage = int(odometer > 150000)
@@ -93,6 +95,7 @@ if st.button("Estimate Price"):
     odometer_bin = pd.cut([odometer], bins=[0, 30000, 60000, 100000, 150000, 200000, 300000], labels=False)[0]
     if np.isnan(odometer_bin): odometer_bin = 0
 
+    # --- Prepare DataFrame for Prediction ---
     input_df = pd.DataFrame([{
         'model': model_clean,
         'condition': condition,
@@ -118,7 +121,15 @@ if st.button("Estimate Price"):
         'odometer_bin': int(odometer_bin)
     }])
 
-    # Predict
-    log_price = model.predict(input_df)[0]
+    # --- Categorical Feature Names ---
+    cat_features = [
+        'model', 'condition', 'cylinders', 'fuel', 'title_status',
+        'transmission', 'drive', 'type', 'paint_color'
+    ]
+
+    # --- Predict with Pool ---
+    input_pool = catboost.Pool(input_df, cat_features=cat_features)
+    log_price = model.predict(input_pool)[0]
     predicted_price = np.expm1(log_price)
+
     st.success(f"Estimated Price: **${predicted_price:,.2f}**")
